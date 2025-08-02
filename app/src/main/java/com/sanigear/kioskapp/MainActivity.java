@@ -6,6 +6,7 @@ import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -13,11 +14,16 @@ import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.provider.Settings;
 import android.text.InputType;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.TranslateAnimation;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
@@ -25,12 +31,15 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
 
     private WebView webView;
+
     private FrameLayout layout;
     private int tapCount = 0;
     private long lastTapTime = 0;
@@ -38,12 +47,12 @@ public class MainActivity extends Activity {
     private static final String TAG = "KioskApp";
     private static final String ALLOWED_DOMAIN = "automation.sanigear.app";
     private boolean kioskModeDisabledByAdmin = false;
+    private LinearLayout toolbar; // Move this to be a class-level field if not already
+    private WebView popupWebView = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.d(TAG, "onCreate started");
-
         layout = new FrameLayout(this);
         setContentView(layout);
 
@@ -55,7 +64,7 @@ public class MainActivity extends Activity {
             showOfflineMessage();
         }
 
-        setupWifiButton();
+        setupToolbar(); // Adds Back, Refresh, Wi-Fi buttons
     }
 
     private void setupDeviceOwnerAndLockTask() {
@@ -76,18 +85,56 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void setupWifiButton() {
-        Button wifiButton = new Button(this);
-        wifiButton.setText("Wi-Fi Settings");
-        wifiButton.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));
+    private void setupToolbar() {
 
-        FrameLayout.LayoutParams wifiParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
+        // Remove existing toolbar if already added
+        if (toolbar != null && toolbar.getParent() != null) {
+            ((ViewGroup) toolbar.getParent()).removeView(toolbar);
+        }
+
+        toolbar = new LinearLayout(this);
+        toolbar.setOrientation(LinearLayout.HORIZONTAL);
+        toolbar.setPadding(10, 10, 10, 10);
+
+        Button backBtn = new Button(this);
+        backBtn.setText("Back");
+        backBtn.setOnClickListener(v -> {
+            if (webView != null && webView.canGoBack()) {
+                webView.goBack();
+            }
+        });
+
+        Button refreshBtn = new Button(this);
+        refreshBtn.setText("Refresh");
+        refreshBtn.setOnClickListener(v -> {
+            if (isNetworkAvailable()) {
+                showWebView();
+            } else {
+                Toast.makeText(this, "Still no internet.", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        Button wifiBtn = new Button(this);
+        wifiBtn.setText("Wi-Fi");
+        wifiBtn.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));
+
+        Button aboutButton = new Button(this);
+        aboutButton.setText("*");
+        aboutButton.setOnClickListener(v -> showAboutDialog());
+
+        toolbar.addView(backBtn);
+        toolbar.addView(refreshBtn);
+        toolbar.addView(wifiBtn);
+        toolbar.addView(aboutButton);
+
+        FrameLayout.LayoutParams toolbarParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
         );
-        wifiParams.gravity = Gravity.BOTTOM | Gravity.END;
-        wifiParams.setMargins(30, 30, 30, 30);
-        layout.addView(wifiButton, wifiParams);
+        toolbarParams.gravity = Gravity.TOP | Gravity.START;
+        toolbarParams.setMargins(30, 30, 30, 30);
+
+        layout.addView(toolbar, toolbarParams);
     }
 
     private void showWebView() {
@@ -96,13 +143,51 @@ public class MainActivity extends Activity {
         webView.getSettings().setDomStorageEnabled(true);
         webView.getSettings().setAllowFileAccess(true);
         webView.getSettings().setAllowContentAccess(true);
+        webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
+        webView.getSettings().setSupportMultipleWindows(true);
 
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
+                WebView newWebView = new WebView(MainActivity.this);
+                newWebView.getSettings().setJavaScriptEnabled(true);
+                newWebView.getSettings().setDomStorageEnabled(true);
+
+                newWebView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                        Uri url = request.getUrl();
+                        String urlStr = url.toString();
+
+                        if (urlStr.endsWith(".pdf")) {
+                            String googleViewer = "https://docs.google.com/gview?embedded=true&url=" + Uri.encode(urlStr);
+                            view.loadUrl(googleViewer);
+                            return true;
+                        }
+
+                        return false;
+                    }
+                });
+
+                popupWebView = newWebView;
+                layout.addView(newWebView);
+
+                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                transport.setWebView(newWebView);
+                resultMsg.sendToTarget();
+
+                return true;
+            }
+        });
+
         webView.setWebViewClient(new SecureWebViewClient());
-        webView.loadUrl("https://" + ALLOWED_DOMAIN + "/a/login");
 
         layout.removeAllViews();
         layout.addView(webView);
+        webView.loadUrl("https://" + ALLOWED_DOMAIN + "/a/login");
+
+        // Re-add toolbar after clearing views
+        setupToolbar();
     }
 
     private void showOfflineMessage() {
@@ -112,16 +197,6 @@ public class MainActivity extends Activity {
         message.setText("No internet connection.\nPlease connect to Wi-Fi.");
         message.setGravity(Gravity.CENTER);
         message.setTextSize(20);
-
-        Button retryButton = new Button(this);
-        retryButton.setText("Try Again");
-        retryButton.setOnClickListener(v -> {
-            if (isNetworkAvailable()) {
-                showWebView();
-            } else {
-                Toast.makeText(this, "Still no internet.", Toast.LENGTH_SHORT).show();
-            }
-        });
 
         FrameLayout.LayoutParams msgParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -137,7 +212,8 @@ public class MainActivity extends Activity {
         retryParams.topMargin = 300;
 
         layout.addView(message, msgParams);
-        layout.addView(retryButton, retryParams);
+
+        setupToolbar(); // Include toolbar even in offline state
     }
 
     private boolean isNetworkAvailable() {
@@ -179,6 +255,20 @@ public class MainActivity extends Activity {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
             Uri uri = request.getUrl();
+            String url = uri.toString();
+
+            if (url.endsWith(".pdf")) {
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setDataAndType(uri, "application/pdf");
+                intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                try {
+                    view.getContext().startActivity(intent);
+                } catch (Exception e) {
+                    Toast.makeText(view.getContext(), "No PDF viewer found", Toast.LENGTH_LONG).show();
+                }
+                return true;
+            }
+
             return uri.getHost() == null || !uri.getHost().contains(ALLOWED_DOMAIN);
         }
     }
@@ -230,4 +320,61 @@ public class MainActivity extends Activity {
         }
         return super.dispatchKeyEvent(event);
     }
+
+    private void showAboutDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+        TextView title = new TextView(this);
+        title.setText("About the Developer");
+        title.setPadding(20, 30, 20, 10);
+        title.setTextSize(20);
+        title.setGravity(Gravity.CENTER);
+        builder.setCustomTitle(title);
+
+        // Container layout
+        LinearLayout container = new LinearLayout(MainActivity.this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(50, 50, 50, 50);
+        container.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        // Cat Image
+        ImageView cat = new ImageView(MainActivity.this);
+        cat.setImageResource(R.drawable.cat_sprite); // ← Replace with your cat image filename
+        LinearLayout.LayoutParams catParams = new LinearLayout.LayoutParams(300, 300);
+        catParams.bottomMargin = 20;
+        cat.setLayoutParams(catParams);
+        container.addView(cat);
+
+        // Info Text
+        TextView info = new TextView(MainActivity.this);
+        info.setText("Kiosk App v1.0\n\nDeveloped by Jeff Hermo\nContact: jeff@sanigear.ca");
+        info.setTextSize(16);
+        info.setPadding(0, 20, 0, 30);
+        info.setGravity(Gravity.CENTER_HORIZONTAL);
+        container.addView(info);
+
+        // Jump Button
+        Button jumpBtn = new Button(MainActivity.this);
+        jumpBtn.setBackgroundColor(Color.RED);
+        jumpBtn.setText("Self Destruct Button");
+        jumpBtn.setOnClickListener(v -> {
+            TranslateAnimation jump = new TranslateAnimation(0, 0, 0, -150);
+            jump.setDuration(300);
+            jump.setRepeatMode(Animation.REVERSE);
+            jump.setRepeatCount(1);
+            cat.startAnimation(jump);
+        });
+
+        container.addView(jumpBtn);
+
+        builder.setView(container);
+        builder.setPositiveButton("Close", (dialog, which) -> dialog.dismiss());
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+
+
+
+
 }
