@@ -238,6 +238,8 @@ public class MainActivity extends Activity {
 
 // 📥 Download and save new PDF
                 pdfFile = File.createTempFile("temp_", ".pdf", getCacheDir());
+                Log.d("PDFHandlerDelete", "Temp PDF created at: " + pdfFile.getAbsolutePath());
+
                 try (InputStream in = new BufferedInputStream(conn.getInputStream());
                      OutputStream out = new FileOutputStream(pdfFile)) {
                     byte[] buffer = new byte[8192];
@@ -253,10 +255,7 @@ public class MainActivity extends Activity {
                 isInPdfViewer = true;
                 startActivity(intent);
 
-                File finalPdfFile = pdfFile;
-                runOnUiThread(() -> new Thread(() -> {
-                    try { Thread.sleep(10000); finalPdfFile.delete(); } catch (Exception ignored) {}
-                }).start());
+
 
             } catch (Exception e) {
                 Log.e("PDFHandler", "Failed to open PDF", e);
