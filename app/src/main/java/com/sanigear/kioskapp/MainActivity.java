@@ -3,10 +3,13 @@ package com.sanigear.kioskapp;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.AppOpsManager;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -61,12 +64,22 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         layout = new FrameLayout(this);
         setContentView(layout);
 
         setupDeviceOwnerAndLockTask();
+
+        startService(new Intent(this, AppWatchdogService.class));
         setupToolbar();
+
+        if (!hasUsageAccess()) {
+            Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
+            startActivity(intent);
+            Toast.makeText(this, "Enable Usage Access for kiosk app", Toast.LENGTH_LONG).show();
+        }
+
 
         if (isNetworkAvailable()) {
             showWebView();
@@ -75,17 +88,47 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean isDefaultLauncher() {
+        final Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.addCategory(Intent.CATEGORY_HOME);
+        ResolveInfo resolveInfo = getPackageManager().resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY);
+
+        return resolveInfo != null && resolveInfo.activityInfo != null
+                && getPackageName().equals(resolveInfo.activityInfo.packageName);
+    }
+
+    private boolean hasUsageAccess() {
+        AppOpsManager appOps = (AppOpsManager) getSystemService(Context.APP_OPS_SERVICE);
+        int mode = appOps.checkOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                android.os.Process.myUid(),
+                getPackageName()
+        );
+        return mode == AppOpsManager.MODE_ALLOWED;
+    }
+
+    private void ensureDefaultLauncher() {
+        if (!isDefaultLauncher()) {
+            if (!isDefaultLauncher()) {
+                promptUserToSelectLauncher();
+                Toast.makeText(this, "Please select Sanigear Kiosk as the Home app.", Toast.LENGTH_LONG).show();
+                openDefaultAppsSettings();
+            }
+        }
+    }
+
+
+
     private void setupDeviceOwnerAndLockTask() {
         ComponentName adminComponent = new ComponentName(this, MyDeviceAdminReceiver.class);
         DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
 
         if (dpm != null && dpm.isDeviceOwnerApp(getPackageName())) {
-            // Whitelist only your app
             dpm.setLockTaskPackages(adminComponent, new String[]{getPackageName()});
 
             if (dpm.isLockTaskPermitted(getPackageName())) {
                 try {
-                    // Full immersive kiosk mode (no status bar, nav bar, recents)
+                    startLockTask(); // Must be called BEFORE immersive flags!
                     getWindow().getDecorView().setSystemUiVisibility(
                             View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                                     | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
@@ -94,17 +137,16 @@ public class MainActivity extends Activity {
                                     | View.SYSTEM_UI_FLAG_FULLSCREEN
                                     | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                     );
-
-                    startLockTask(); // Lock task now enforces full lock
-                    Log.d(TAG, "Kiosk Mode started with Lock Task");
+                    Log.d(TAG, "Kiosk Mode started");
                 } catch (Exception e) {
-                    Log.e(TAG, "startLockTask() failed", e);
+                    Log.e(TAG, "Failed to start lock task", e);
                 }
             }
         } else {
             Toast.makeText(this, "App is not Device Owner", Toast.LENGTH_LONG).show();
         }
     }
+
 
 
     private void setupToolbar() {
@@ -189,6 +231,12 @@ public class MainActivity extends Activity {
                 if (conn.getResponseCode() != HttpURLConnection.HTTP_OK)
                     throw new IOException("HTTP error: " + conn.getResponseCode());
 
+                deleteExistingPdfs(); // <- delete old ones before downloading new
+
+                File cacheDir = getCacheDir();
+
+
+// 📥 Download and save new PDF
                 pdfFile = File.createTempFile("temp_", ".pdf", getCacheDir());
                 try (InputStream in = new BufferedInputStream(conn.getInputStream());
                      OutputStream out = new FileOutputStream(pdfFile)) {
@@ -218,6 +266,33 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+        private void deleteExistingPdfs() {
+            File cacheDir = getCacheDir();
+            if (cacheDir == null) {
+                Log.d("PDFHandlerDelete", "Cache dir is null.");
+                return;
+            }
+
+            Log.d("PDFHandlerDelete", "Cache path: " + cacheDir.getAbsolutePath());
+
+            File[] files = cacheDir.listFiles();
+            if (files == null || files.length == 0) {
+                Log.d("PDFHandlerDelete", "No files found in cache.");
+                return;
+            }
+
+            for (File f : files) {
+                Log.d("PDFHandlerDelete", "Found file: " + f.getName());
+                if (f.getName().endsWith(".pdf")) {
+                    Log.d("PDFHandlerDelete", "Deleting file: " + f.getName());
+                    boolean deleted = f.delete();
+                    Log.d("PDFHandlerDelete", "Deleted: " + deleted);
+                }
+            }
+        }
+
+
+
     private void showOfflineMessage() {
         layout.removeAllViews();
         TextView msg = new TextView(this);
@@ -241,13 +316,24 @@ public class MainActivity extends Activity {
             return info != null && info.isConnected();
         }
     }
+    private void promptUserToSelectLauncher() {
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.addCategory(Intent.CATEGORY_HOME);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
+    }
 
+    private void openDefaultAppsSettings() {
+        Intent intent = new Intent(Settings.ACTION_HOME_SETTINGS);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
+    }
 
     @Override
     protected void onResume() {
         super.onResume();
         Log.d(TAG, "MainActivity resumed");
-
+        ensureDefaultLauncher();
         // Restart lock task if needed
         if (!kioskModeDisabledByAdmin) {
             DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
@@ -332,7 +418,7 @@ public class MainActivity extends Activity {
         TextView info = new TextView(this);
         info.setText("Kiosk App v1.0 " +
                         "\nDeveloped by Jeff Hermo " +
-                "\n\nContact: jeff@sanigear.ca");
+                "\nContact: jeff@sanigear.ca\n\n");
         info.setGravity(Gravity.CENTER_HORIZONTAL);
         container.addView(info);
 
