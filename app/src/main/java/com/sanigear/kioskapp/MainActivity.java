@@ -518,17 +518,21 @@ public class MainActivity extends Activity {
     private void showAdminPinDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Enter Admin PIN");
+
         EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         builder.setView(input);
+
         builder.setPositiveButton("Unlock", (dialog, which) -> {
             if ("1234".equals(input.getText().toString())) {
                 kioskModeDisabledByAdmin = true;
                 stopLockTask();
 
-                // ✅ Stop watchdog service
-                stopService(new Intent(this, AppWatchdogService.class));
+                // ✅ Use application context to stop the service properly
+                Intent stopIntent = new Intent(getApplicationContext(), AppWatchdogService.class);
+                getApplicationContext().stopService(stopIntent);
 
+                // ✅ Now open the default launcher settings
                 Intent intent = new Intent(Settings.ACTION_HOME_SETTINGS);
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(intent);
@@ -538,9 +542,12 @@ public class MainActivity extends Activity {
                 Toast.makeText(this, "Incorrect PIN", Toast.LENGTH_SHORT).show();
             }
         });
+
         builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+
         builder.show();
     }
+
 
     private void showAboutDialog() {
 
