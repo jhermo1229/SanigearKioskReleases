@@ -17,6 +17,10 @@ import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 public class AppWatchdogService extends Service {
 
     private static final String TAG = "AppWatchdogService";
@@ -24,10 +28,14 @@ public class AppWatchdogService extends Service {
     private static final String CHANNEL_ID = "watchdog_channel";
 
     private static final String KIOSK_PACKAGE = "com.sanigear.kioskapp";
-    private static final String[] WHITELIST = {
-            KIOSK_PACKAGE,
-            "com.adobe.reader"
-    };
+    private static final Set<String> WHITELISTED_PACKAGES = new HashSet<>(Arrays.asList(
+            "com.sanigear.kioskapp",
+            "com.adobe.reader",
+            "com.android.printspooler",
+            "com.android.bips",
+            "com.google.android.printservice.recommendation",
+            "com.android.settings"
+    ));
 
     private Handler handler;
     private Runnable checker;
@@ -47,7 +55,7 @@ public class AppWatchdogService extends Service {
             @Override
             public void run() {
                 String currentApp = getForegroundApp();
-                if (currentApp != null && !isWhitelisted(currentApp)) {
+                if (currentApp != null && !isAppWhitelisted(currentApp)) {
                     if (!currentApp.equals(lastApp)) {
                         Log.w(TAG, "Unauthorized app: " + currentApp);
                         recoverToKiosk();
@@ -63,13 +71,14 @@ public class AppWatchdogService extends Service {
         handler.post(checker);
     }
 
-    private boolean isWhitelisted(String packageName) {
-        for (String allowed : WHITELIST) {
-            if (allowed.equals(packageName)) return true;
+    private boolean isAppWhitelisted(String packageName) {
+        for (String allowed : WHITELISTED_PACKAGES) {
+            if (packageName.equals(allowed) || packageName.startsWith(allowed + ".")) {
+                return true;
+            }
         }
         return false;
     }
-
     private void recoverToKiosk() {
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);

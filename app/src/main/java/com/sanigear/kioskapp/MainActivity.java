@@ -55,6 +55,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * MainActivity for Sanigear Kiosk App
@@ -81,6 +84,14 @@ public class MainActivity extends Activity {
     private Handler watchdogHandler = new Handler();
     private Runnable watchdogChecker;
     private static final long CHECK_INTERVAL = 3000; // 3 seconds
+
+    private static final Set<String> WHITELISTED_PACKAGES = new HashSet<>(Arrays.asList(
+            "com.sanigear.kioskapp",
+            "com.adobe.reader",
+            "com.android.printspooler",
+            "com.android.bips",
+            "com.google.android.printservice.recommendation"
+    ));
 
     /**
      * Initializes activity layout and kiosk controls.
@@ -116,9 +127,10 @@ public class MainActivity extends Activity {
     private void startWatchdog() {
         watchdogChecker = () -> {
             String currentApp = getForegroundApp();
+            Log.d("Watchdog", "Current foreground app: " + currentApp);
 
             if (currentApp != null && !isAppWhitelisted(currentApp)) {
-                Log.w("KIOSK-WATCHDOG", "Detected unauthorized app: " + currentApp);
+                Log.w("Watchdog", "Kicking app: " + currentApp);
                 recoverToKiosk();
             }
 
@@ -158,9 +170,13 @@ public class MainActivity extends Activity {
      * App whitelist used to allow Adobe Reader and Kiosk app itself.
      */
     private boolean isAppWhitelisted(String packageName) {
-        return packageName.equals(getPackageName()) || packageName.equals("com.adobe.reader");
+        for (String allowed : WHITELISTED_PACKAGES) {
+            if (packageName.equals(allowed) || packageName.startsWith(allowed + ".")) {
+                return true;
+            }
+        }
+        return false;
     }
-
     /**
      * Forces the app back to MainActivity (Kiosk Home).
      */
@@ -507,6 +523,10 @@ public class MainActivity extends Activity {
             if ("1234".equals(input.getText().toString())) {
                 kioskModeDisabledByAdmin = true;
                 stopLockTask();
+
+                // ✅ Stop watchdog service
+                stopService(new Intent(this, AppWatchdogService.class));
+
                 Intent intent = new Intent(Settings.ACTION_HOME_SETTINGS);
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(intent);
@@ -523,7 +543,7 @@ public class MainActivity extends Activity {
     private void showAboutDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         TextView title = new TextView(this);
-        title.setText("About the Developers");
+        title.setText("About the Developer");
         title.setGravity(Gravity.CENTER);
         title.setTextSize(20);
         builder.setCustomTitle(title);
