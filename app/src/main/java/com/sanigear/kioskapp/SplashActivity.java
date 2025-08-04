@@ -18,12 +18,18 @@ public class SplashActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-
-        // Optional: Show logo or wait briefly
-        new Handler().postDelayed(() -> {
+        // Skip splash screen if the activity is not the root activity (i.e., app is resuming)
+        if (isTaskRoot()) {
+            // Show splash screen only if this activity is the root of the task stack
+            new Handler().postDelayed(() -> {
+                startActivity(new Intent(this, MainActivity.class));
+                finish();
+            }, 3000); // 3 second delay for splash
+        } else {
+            // If the splash screen is skipped (activity already exists), directly load MainActivity
             startActivity(new Intent(this, MainActivity.class));
             finish();
-        }, 3000); // 3 second delay for splash
+        }
 
         // Logo Image
         ImageView logo = new ImageView(this);
@@ -60,12 +66,6 @@ public class SplashActivity extends Activity {
 
         setContentView(layout);
 
-        // Wait 2.5 seconds before launching MainActivity
-        new Handler().postDelayed(() -> {
-            startActivity(new Intent(SplashActivity.this, MainActivity.class));
-            finish();
-        }, 2500);
-
         SharedPreferences prefs = getSharedPreferences("kiosk_prefs", MODE_PRIVATE);
         boolean firstLaunchDone = prefs.getBoolean("first_launch_done", false);
 
@@ -78,6 +78,7 @@ public class SplashActivity extends Activity {
             startWatchdogService();
         }
     }
+
 
     private void startWatchdogService() {
         Intent serviceIntent = new Intent(this, AppWatchdogService.class);

@@ -10,6 +10,7 @@ import android.app.usage.UsageStatsManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Color;
@@ -68,6 +69,7 @@ public class MainActivity extends Activity {
 
     private static final String TAG = "KioskApp";
     private static final String ALLOWED_DOMAIN = "automation.sanigear.app";
+    private static final String KIOSK_PACKAGE = "com.sanigear.kioskapp";
 
     // Layout components
     private FrameLayout layout;
@@ -125,22 +127,21 @@ public class MainActivity extends Activity {
         }
     }
 
-    // Watchdog logic to detect unauthorized app usage
-    private void startWatchdog() {
-        watchdogChecker = () -> {
-            String currentApp = getForegroundApp();
-            Log.d("Watchdog", "Current foreground app: " + currentApp);
-
-            if (currentApp != null && !isAppWhitelisted(currentApp)) {
-                Log.w("Watchdog", "Kicking app: " + currentApp);
-                recoverToKiosk();
-            }
-
-            watchdogHandler.postDelayed(watchdogChecker, CHECK_INTERVAL);
-        };
-        watchdogHandler.post(watchdogChecker);
-    }
-
+//    // Watchdog logic to detect unauthorized app usage
+//    private void startWatchdog() {
+//        watchdogChecker = () -> {
+//            String currentApp = getForegroundApp();
+//            Log.d("Watchdog", "Current foreground app: " + currentApp);
+//
+//            if (currentApp != null && !isAppWhitelisted(currentApp)) {
+//                Log.w("Watchdog", "Kicking app: " + currentApp);
+//                recoverToKiosk();
+//            }
+//
+//            watchdogHandler.postDelayed(watchdogChecker, CHECK_INTERVAL);
+//        };
+//        watchdogHandler.post(watchdogChecker);
+//    }
     private void stopWatchdog() {
         if (watchdogChecker != null) {
             watchdogHandler.removeCallbacks(watchdogChecker);
@@ -183,11 +184,17 @@ public class MainActivity extends Activity {
      * Forces the app back to MainActivity (Kiosk Home).
      */
     private void recoverToKiosk() {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        startActivity(intent);
+        // Check if the app is already in the foreground
+        String currentApp = getForegroundApp();
+        if (!KIOSK_PACKAGE.equals(currentApp)) {
+            // If not in the kiosk app, return to it
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);  // Ensure it brings the app to the front
+            startActivity(intent);
+        } else {
+            Log.d(TAG, "Already in Kiosk Mode. No need to restart MainActivity.");
+        }
     }
-
     /**
      * Determines if Sanigear is currently the default launcher.
      */
@@ -454,54 +461,77 @@ public class MainActivity extends Activity {
             return am.isInLockTaskMode();
         }
     }
+    protected void onPause() {
+        super.onPause();
+        Log.d("POGI", "ONPAUSE");
 
+        // Save WebView state (scroll position or URL)
+        if (webView != null) {
+            // You can save the URL or WebView state here
+            String currentUrl = webView.getUrl();  // Save the current URL
+            Log.d("POGI", "webview NOT NULL ON PAUSE");
+            // You could also save other WebView state (like scrolling position) if necessary
+            // You can save it in SharedPreferences or any other persistent storage for later use
+            SharedPreferences prefs = getSharedPreferences("webview_prefs", MODE_PRIVATE);
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putString("lastUrl", currentUrl);
+            Log.d("POGI", currentUrl);
+            editor.apply();
+        }
+    }
+
+    protected void onStart() {
+        super.onStart();
+        Log.d("POGI", "MainActivity started");
+    }
     @Override
     protected void onResume() {
         super.onResume();
-        Log.d(TAG, "MainActivity resumed");
+        Log.d("POGI", "MainActivity resumed");
+
+        // Retrieve the saved WebView state (if needed)
+        SharedPreferences prefs = getSharedPreferences("webview_prefs", MODE_PRIVATE);
+        String lastUrl = prefs.getString("lastUrl", null);
+
+        // If we have a saved URL, restore it in the WebView
+        if (webView != null && lastUrl != null) {
+            Log.d("POGI", "OnRESUME LOAD URL");
+            webView.loadUrl(lastUrl);  // Load the saved URL
+        }
         ensureDefaultLauncher();
 
-        Log.d("MainActivity", "Resuming, ensuring watchdog is running");
+        Log.d("POGI", "Resuming, ensuring watchdog service is running");
 
+        // Start the AppWatchdogService (this is sufficient, no need to start an additional watchdog)
         Intent watchdog = new Intent(this, AppWatchdogService.class);
         startService(watchdog);
 
-        if (!isInKioskMode()) {
-            Log.d("MainActivity", "Not in Kiosk Mode. Starting watchdog.");
-            startWatchdog();
-        } else {
-            Log.d("MainActivity", "In Kiosk Mode. Stopping watchdog.");
-            stopWatchdog();
-        }
         // Restart lock task if needed
         if (!kioskModeDisabledByAdmin) {
             DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
             if (dpm != null && dpm.isDeviceOwnerApp(getPackageName()) &&
                     dpm.isLockTaskPermitted(getPackageName())) {
                 try {
-                    Log.d(TAG, "Re-entering Lock Task Mode");
+                    Log.d("POGI", "Re-entering Lock Task Mode");
                     startLockTask();
                 } catch (Exception e) {
-                    Log.e(TAG, "Failed to resume lock task", e);
+                    Log.e("POGI", "Failed to resume lock task", e);
                 }
             }
         }
 
         // ✅ Reattach WebView if not present
         if (webView != null) {
-            layout.removeAllViews(); // ensure clean
+            layout.removeAllViews(); // Ensure clean
             layout.addView(webView);
             setupToolbar();
 
             webView.setVisibility(View.VISIBLE);
-            webView.reload(); // refresh page if needed
+            webView.reload(); // Refresh page if needed
         }
 
         Utils.checkForUpdate(this);
     }
-
-
-
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {

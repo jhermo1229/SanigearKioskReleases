@@ -49,7 +49,7 @@
             android:showOnLockScreen="true"
             android:immersive="true"
             android:taskAffinity=""
-            android:clearTaskOnLaunch="true"
+            android:clearTaskOnLaunch="false"
             tools:ignore="DiscouragedApi"/>
 
         <receiver

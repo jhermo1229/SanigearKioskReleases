@@ -81,11 +81,19 @@ public class AppWatchdogService extends Service {
         return false;
     }
     private void recoverToKiosk() {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        startActivity(intent);
-    }
+        String currentApp = getForegroundApp();
+        Log.d(TAG, "Current app in watchdog: " + currentApp);
 
+        if (!KIOSK_PACKAGE.equals(currentApp)) {
+            // If not in the kiosk app, return to it
+            Log.d(TAG, "Recovering to kiosk mode.");
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);  // Bring it to the front
+            startActivity(intent);
+        } else {
+            Log.d(TAG, "Already in Kiosk Mode. No need to restart MainActivity.");
+        }
+    }
     private String getForegroundApp() {
         UsageStatsManager usm = (UsageStatsManager) getSystemService(Context.USAGE_STATS_SERVICE);
         if (usm == null) return null;
