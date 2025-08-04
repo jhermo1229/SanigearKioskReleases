@@ -18,9 +18,16 @@ public class SplashActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+
+        // Optional: Show logo or wait briefly
+        new Handler().postDelayed(() -> {
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
+        }, 3000); // 3 second delay for splash
+
         // Logo Image
         ImageView logo = new ImageView(this);
-        logo.setImageResource(R.drawable.logo);  // logo.png must be in res/drawable/
+        logo.setImageResource(R.drawable.sanigear_splash_logo);  // logo.png must be in res/drawable/
         logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
 
         // Company Name Text
@@ -39,6 +46,7 @@ public class SplashActivity extends Activity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setGravity(Gravity.CENTER);
         layout.setPadding(50, 50, 50, 50);
+        layout.setBackgroundColor(Color.WHITE);
 
         layout.addView(logo);
         layout.addView(title);

@@ -27,9 +27,17 @@
             android:exported="false"
             android:enabled="true"
             android:foregroundServiceType="dataSync" />
-        <activity android:name=".SplashActivity"
-            android:exported="true">
 
+        <activity
+            android:name=".SplashActivity"
+            android:exported="true"> <!-- Optional custom splash theme -->
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
         </activity>
 
         <activity
@@ -42,15 +50,7 @@
             android:immersive="true"
             android:taskAffinity=""
             android:clearTaskOnLaunch="true"
-            tools:ignore="DiscouragedApi">
-
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.HOME" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            tools:ignore="DiscouragedApi"/>
 
         <receiver
             android:name=".MyDeviceAdminReceiver"
