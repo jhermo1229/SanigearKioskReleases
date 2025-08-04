@@ -2,9 +2,11 @@ package com.sanigear.kioskapp;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.Gravity;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -55,5 +57,22 @@ public class SplashActivity extends Activity {
             startActivity(new Intent(SplashActivity.this, MainActivity.class));
             finish();
         }, 2500);
+
+        SharedPreferences prefs = getSharedPreferences("kiosk_prefs", MODE_PRIVATE);
+        boolean firstLaunchDone = prefs.getBoolean("first_launch_done", false);
+
+        if (!firstLaunchDone) {
+            Log.d("Splash", "First launch: delaying watchdog 15 seconds");
+            new Handler().postDelayed(() -> {
+                startWatchdogService();
+            }, 15000); // 15 seconds
+        } else {
+            startWatchdogService();
+        }
+    }
+
+    private void startWatchdogService() {
+        Intent serviceIntent = new Intent(this, AppWatchdogService.class);
+        startService(serviceIntent);
     }
 }

@@ -33,6 +33,7 @@ public class Utils {
 
     public static void checkForUpdate(Context context, @Nullable UpdateListener listener) {
         SharedPreferences prefs = context.getSharedPreferences("update_prefs", Context.MODE_PRIVATE);
+        prefs.edit().putBoolean("first_launch_done", true).apply();
         long lastCheck = prefs.getLong("last_check", 0);
         long now = System.currentTimeMillis();
 
@@ -96,6 +97,7 @@ public class Utils {
                 }
             }
         }).start();
+
     }
 
     private static boolean isNewerVersion(String newVer, String oldVer) {
