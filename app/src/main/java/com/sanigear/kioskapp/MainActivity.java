@@ -524,7 +524,7 @@ public class MainActivity extends Activity {
         builder.setView(input);
 
         builder.setPositiveButton("Unlock", (dialog, which) -> {
-            if ("1234".equals(input.getText().toString())) {
+            if ("0710".equals(input.getText().toString())) {
                 kioskModeDisabledByAdmin = true;
                 stopLockTask();
 
