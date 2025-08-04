@@ -90,7 +90,8 @@ public class MainActivity extends Activity {
             "com.adobe.reader",
             "com.android.printspooler",
             "com.android.bips",
-            "com.google.android.printservice.recommendation"
+            "com.google.android.printservice.recommendation",
+            "com.google.android.packageinstaller"
     ));
 
     /**
@@ -227,7 +228,7 @@ public class MainActivity extends Activity {
         DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
 
         if (dpm != null && dpm.isDeviceOwnerApp(getPackageName())) {
-            dpm.setLockTaskPackages(adminComponent, new String[]{getPackageName()});
+            dpm.setLockTaskPackages(adminComponent, new String[]{getPackageName(),"com.google.android.packageinstaller"});
 
             if (dpm.isLockTaskPermitted(getPackageName())) {
                 try {
@@ -573,7 +574,7 @@ public class MainActivity extends Activity {
         container.addView(info);
 
         Button jumpBtn = new Button(this);
-        jumpBtn.setText("Don't push 5xxxx");
+        jumpBtn.setText("Don't push 5x");
         jumpBtn.setBackgroundColor(Color.RED);
         final int[] tapCounter = {0};
         final MediaPlayer[] meowSound = {MediaPlayer.create(this, R.raw.meow)};

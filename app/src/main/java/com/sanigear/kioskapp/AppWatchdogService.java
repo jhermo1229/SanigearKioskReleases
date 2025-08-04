@@ -34,7 +34,8 @@ public class AppWatchdogService extends Service {
             "com.android.printspooler",
             "com.android.bips",
             "com.google.android.printservice.recommendation",
-            "com.android.settings"
+            "com.android.settings",
+            "com.google.android.packageinstaller"
     ));
 
     private Handler handler;
