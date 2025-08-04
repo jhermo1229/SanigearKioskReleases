@@ -6,13 +6,13 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.app.usage.UsageEvents;
 import android.app.usage.UsageStatsManager;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -20,7 +20,8 @@ import androidx.core.app.NotificationCompat;
 public class AppWatchdogService extends Service {
 
     private static final String TAG = "AppWatchdogService";
-    private static final long INTERVAL = 3000;
+    private static final long INTERVAL = 2000; // Run every 2 seconds
+    private static final String CHANNEL_ID = "watchdog_channel";
 
     private static final String KIOSK_PACKAGE = "com.sanigear.kioskapp";
     private static final String[] WHITELIST = {
@@ -30,37 +31,35 @@ public class AppWatchdogService extends Service {
 
     private Handler handler;
     private Runnable checker;
+    private String lastApp = null;
 
     @Override
     public void onCreate() {
         super.onCreate();
+        createNotificationChannel();
+        startForeground(1, createNotification());
 
-        // ⏳ Start foreground service on Android 8+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForeground(1, createNotification());
-        }
+        Toast.makeText(this, "Watchdog started", Toast.LENGTH_SHORT).show();
+        Log.d(TAG, "Watchdog started");
 
         handler = new Handler();
-        checker = () -> {
-            String currentApp = getForegroundApp();
-
-            if (currentApp != null) {
-                if (KIOSK_PACKAGE.equals(currentApp)) {
-                    Log.d(TAG, "Kiosk app resumed. Stopping watchdog.");
-                    stopSelf(); // ✅ Stop watchdog when kiosk is active
-                    return;
+        checker = new Runnable() {
+            @Override
+            public void run() {
+                String currentApp = getForegroundApp();
+                if (currentApp != null && !isWhitelisted(currentApp)) {
+                    if (!currentApp.equals(lastApp)) {
+                        Log.w(TAG, "Unauthorized app: " + currentApp);
+                        recoverToKiosk();
+                        lastApp = currentApp;
+                    }
+                } else {
+                    lastApp = currentApp;
                 }
 
-                if (!isWhitelisted(currentApp)) {
-                    Log.w(TAG, "Unauthorized app: " + currentApp);
-                    recoverToKiosk();
-                }
+                handler.postDelayed(this, INTERVAL);
             }
-
-            handler.postDelayed(checker, INTERVAL);
         };
-
-
         handler.post(checker);
     }
 
@@ -78,41 +77,43 @@ public class AppWatchdogService extends Service {
     }
 
     private String getForegroundApp() {
-        Log.d(TAG, "Checking usage events...");
         UsageStatsManager usm = (UsageStatsManager) getSystemService(Context.USAGE_STATS_SERVICE);
         if (usm == null) return null;
 
         long now = System.currentTimeMillis();
         UsageEvents events = usm.queryEvents(now - 10000, now);
         UsageEvents.Event event = new UsageEvents.Event();
-        String lastApp = null;
+        String lastAppSeen = null;
 
         while (events.hasNextEvent()) {
             events.getNextEvent(event);
-            Log.d(TAG, "Eeevent: " + event.getPackageName() + " Type: " + event.getEventType());
             if (event.getEventType() == UsageEvents.Event.MOVE_TO_FOREGROUND) {
-                lastApp = event.getPackageName();
+                lastAppSeen = event.getPackageName();
             }
         }
-        return lastApp;
+
+        Log.d(TAG, "Foreground app: " + lastAppSeen);
+        return lastAppSeen;
     }
 
-    private Notification createNotification() {
-        String channelId = "watchdog_channel";
-        String channelName = "Kiosk App Watchdog";
-
+    private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel chan = new NotificationChannel(channelId, channelName,
-                    NotificationManager.IMPORTANCE_MIN);
+            NotificationChannel chan = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Kiosk App Watchdog",
+                    NotificationManager.IMPORTANCE_MIN
+            );
             chan.setLockscreenVisibility(Notification.VISIBILITY_SECRET);
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) manager.createNotificationChannel(chan);
         }
+    }
 
-        return new NotificationCompat.Builder(this, channelId)
-                .setContentTitle("Kiosk Mode Watchdog")
-                .setContentText("Monitoring apps...")
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+    private Notification createNotification() {
+        return new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("Watchdog Running")
+                .setContentText("Monitoring active apps...")
+                .setSmallIcon(R.drawable.ic_launcher)
                 .setPriority(NotificationCompat.PRIORITY_MIN)
                 .setOngoing(true)
                 .build();
@@ -120,23 +121,14 @@ public class AppWatchdogService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Notification notification = new NotificationCompat.Builder(this, "watchdog_channel")
-                .setContentTitle("Kiosk Watchdog")
-                .setContentText("Monitoring device...")
-                .setSmallIcon(R.drawable.ic_launcher)
-                .build();
-
-        startForeground(1, notification);
-
-        Log.d(TAG, "AppWatchdogService started");
         return START_STICKY;
     }
-
 
     @Override
     public void onDestroy() {
         handler.removeCallbacks(checker);
         super.onDestroy();
+        Log.d(TAG, "Watchdog stopped");
     }
 
     @Nullable

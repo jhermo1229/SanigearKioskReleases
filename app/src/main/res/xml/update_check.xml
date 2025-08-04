@@ -1,0 +1,6 @@
+<preferences xmlns:android="http://schemas.android.com/apk/res/android">
+    <EditTextPreference
+        android:key="last_check"
+        android:defaultValue="0"
+        android:enabled="false" />
+</preferences>

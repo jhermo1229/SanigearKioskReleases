@@ -12,7 +12,7 @@ public class BootReceiver extends BroadcastReceiver {
 
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction()) ||
                 Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(intent.getAction())) {
-
+            context.startService(new Intent(context, AppWatchdogService.class));
             Log.d("KioskApp", "Boot or Locked Boot completed. Launching MainActivity...");
 
             Intent launchIntent = new Intent(context, SplashActivity.class);
