@@ -26,6 +26,7 @@ import android.os.Message;
 import android.provider.Settings;
 import android.text.InputType;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -542,6 +543,21 @@ public class MainActivity extends Activity {
     }
 
     private void showAboutDialog() {
+
+        // Convert 16dp to pixels
+        int spacingInDp = 16;
+        int spacingInPx = (int) TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                spacingInDp,
+                getResources().getDisplayMetrics()
+        );
+
+    // Create spacer
+        View spacer = new View(this);
+        spacer.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                spacingInPx
+        ));
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         TextView title = new TextView(this);
         title.setText("About the Developer");
@@ -633,6 +649,7 @@ public class MainActivity extends Activity {
                 }
             });
         });
+        container.addView(spacer);
         container.addView(updateBtn);
 
 
