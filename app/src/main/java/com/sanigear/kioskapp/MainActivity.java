@@ -612,7 +612,7 @@ public class MainActivity extends Activity {
                     runOnUiThread(() -> {
                         Toast.makeText(MainActivity.this, "You're already up to date!", Toast.LENGTH_SHORT).show();
                         updateBtn.setEnabled(true);
-                        updateBtn.setText("Check for Update");
+                        updateBtn.setText("Update App");
                     });
                 }
 
