@@ -573,7 +573,7 @@ public class MainActivity extends Activity {
         container.addView(info);
 
         Button jumpBtn = new Button(this);
-        jumpBtn.setText("Don't push 5x");
+        jumpBtn.setText("Don't push 5xxxx");
         jumpBtn.setBackgroundColor(Color.RED);
         final int[] tapCounter = {0};
         final MediaPlayer[] meowSound = {MediaPlayer.create(this, R.raw.meow)};
