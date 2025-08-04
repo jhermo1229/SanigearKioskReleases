@@ -43,12 +43,23 @@ public class AppWatchdogService extends Service {
         handler = new Handler();
         checker = () -> {
             String currentApp = getForegroundApp();
-            if (currentApp != null && !isWhitelisted(currentApp)) {
-                Log.w(TAG, "Unauthorized app: " + currentApp);
-                recoverToKiosk();
+
+            if (currentApp != null) {
+                if (KIOSK_PACKAGE.equals(currentApp)) {
+                    Log.d(TAG, "Kiosk app resumed. Stopping watchdog.");
+                    stopSelf(); // ✅ Stop watchdog when kiosk is active
+                    return;
+                }
+
+                if (!isWhitelisted(currentApp)) {
+                    Log.w(TAG, "Unauthorized app: " + currentApp);
+                    recoverToKiosk();
+                }
             }
+
             handler.postDelayed(checker, INTERVAL);
         };
+
 
         handler.post(checker);
     }

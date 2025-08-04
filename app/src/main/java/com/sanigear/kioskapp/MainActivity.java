@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Color;
+import android.media.MediaPlayer;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -71,7 +72,7 @@ public class MainActivity extends Activity {
 
         setupDeviceOwnerAndLockTask();
 
-        startService(new Intent(this, AppWatchdogService.class));
+
         setupToolbar();
 
         if (!hasUsageAccess()) {
@@ -253,6 +254,7 @@ public class MainActivity extends Activity {
                 intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY | Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 stopLockTask();
                 isInPdfViewer = true;
+                startService(new Intent(this, AppWatchdogService.class));
                 startActivity(intent);
 
 
@@ -414,23 +416,44 @@ public class MainActivity extends Activity {
         cat.setLayoutParams(new LinearLayout.LayoutParams(300, 300));
         container.addView(cat);
 
+        String versionName = "Unknown";
+        try {
+            versionName = getPackageManager()
+                    .getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception ignored) {}
+
         TextView info = new TextView(this);
-        info.setText("Kiosk App v1.0 " +
-                        "\nDeveloped by Jeff Hermo " +
+        info.setText("Sanigear Kiosk v" + versionName +
+                "\nDeveloped by Jeff Hermo " +
                 "\nContact: jeff@sanigear.ca\n\n");
+
         info.setGravity(Gravity.CENTER_HORIZONTAL);
         container.addView(info);
 
         Button jumpBtn = new Button(this);
         jumpBtn.setText("Self Destruct Button");
         jumpBtn.setBackgroundColor(Color.RED);
+        final int[] tapCounter = {0};
+        final MediaPlayer[] meowSound = {MediaPlayer.create(this, R.raw.meow)};
+
         jumpBtn.setOnClickListener(v -> {
+            tapCounter[0]++;
+
             TranslateAnimation jump = new TranslateAnimation(0, 0, 0, -150);
             jump.setDuration(300);
             jump.setRepeatMode(Animation.REVERSE);
             jump.setRepeatCount(1);
             cat.startAnimation(jump);
+
+            if (tapCounter[0] == 5) {
+                if (meowSound[0] != null) {
+                    meowSound[0].start();
+                }
+                Toast.makeText(this, "Meow! 🐱", Toast.LENGTH_SHORT).show();
+                tapCounter[0] = 0;
+            }
         });
+
         container.addView(jumpBtn);
 
         builder.setView(container);
