@@ -106,6 +106,8 @@ public class MainActivity extends Activity {
         layout = new FrameLayout(this);
         setContentView(layout);
 
+        disableStatusBar();
+
         // Device Owner & Kiosk enforcement
         setupDeviceOwnerAndLockTask();
 
@@ -707,6 +709,21 @@ public class MainActivity extends Activity {
             String url = uri.toString();
             if (url.endsWith(".pdf")) return true;
             return uri.getHost() == null || !uri.getHost().contains(ALLOWED_DOMAIN);
+        }
+    }
+
+    private void disableStatusBar() {
+        DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        ComponentName adminComponent = new ComponentName(this, MyDeviceAdminReceiver.class);
+
+        if (dpm != null && dpm.isAdminActive(adminComponent)) {
+            try {
+                dpm.setStatusBarDisabled(adminComponent, true);
+            } catch (SecurityException e) {
+                Log.e("KioskApp", "Failed to disable status bar", e);
+            }
+        } else {
+            Log.w("KioskApp", "Device admin not active. Cannot disable status bar.");
         }
     }
 }
