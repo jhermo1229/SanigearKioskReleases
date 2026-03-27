@@ -94,7 +94,8 @@ public class MainActivity extends Activity {
             "com.android.printspooler",
             "com.android.bips",
             "com.google.android.printservice.recommendation",
-            "com.google.android.packageinstaller"
+            "com.google.android.packageinstaller",
+            "com.android.settings"
     ));
 
     /**
@@ -277,7 +278,7 @@ public class MainActivity extends Activity {
             if (isNetworkAvailable()) showWebView();
             else Toast.makeText(this, "Still no internet.", Toast.LENGTH_SHORT).show();
         });
-        addButton("Wi-Fi", v -> startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));
+        addButton("Connections", v -> showConnectionsDialog());
         addButton("*", v -> showAboutDialog());
 
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
@@ -295,6 +296,48 @@ public class MainActivity extends Activity {
         btn.setText(label);
         btn.setOnClickListener(action);
         toolbar.addView(btn);
+    }
+
+    //Open wifi and bluetooth
+    private void showConnectionsDialog() {
+        String[] options = {"Wi-Fi", "Bluetooth"};
+
+        new AlertDialog.Builder(this)
+                .setTitle("Connections")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        openWifiSettings();
+                    } else if (which == 1) {
+                        openBluetoothSettings();
+                    }
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void openWifiSettings() {
+        try {
+            Intent intent;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                intent = new Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY);
+            } else {
+                intent = new Intent(Settings.ACTION_WIFI_SETTINGS);
+            }
+
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "Cannot open Wi-Fi", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void openBluetoothSettings() {
+        try {
+            Intent intent = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "Cannot open Bluetooth", Toast.LENGTH_SHORT).show();
+        }
     }
 
     // Initialize main WebView and support for popup windows
