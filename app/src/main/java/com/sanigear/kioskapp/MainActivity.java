@@ -239,7 +239,12 @@ public class MainActivity extends Activity {
         DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
 
         if (dpm != null && dpm.isDeviceOwnerApp(getPackageName())) {
-            dpm.setLockTaskPackages(adminComponent, new String[]{getPackageName(),"com.google.android.packageinstaller"});
+            dpm.setLockTaskPackages(adminComponent, new String[]{
+                    getPackageName(),
+                    "com.google.android.packageinstaller",
+                    "com.android.settings",
+                    "com.android.systemui"
+            });
 
             if (dpm.isLockTaskPermitted(getPackageName())) {
                 try {
