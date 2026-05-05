@@ -301,9 +301,10 @@ public class MainActivity extends Activity {
 
 // Battery bar background (outline)
         FrameLayout batteryFrame = new FrameLayout(this);
-        batteryFrame.setLayoutParams(new LinearLayout.LayoutParams(150, 50));
+        batteryFrame.setLayoutParams(new LinearLayout.LayoutParams(100, 30));
         batteryFrame.setBackgroundColor(Color.DKGRAY);
         batteryFrame.setBackgroundResource(android.R.drawable.alert_light_frame);
+        batteryFrame.setPadding(2, 2, 2, 2);
 
 // Inner fill (actual battery level)
         batteryFill = new View(this);
@@ -312,12 +313,22 @@ public class MainActivity extends Activity {
 // Percentage text
         batteryText = new TextView(this);
         batteryText.setTextColor(Color.BLACK);
-        batteryText.setTextSize(14);
+        batteryText.setTextSize(12);
         batteryText.setGravity(Gravity.CENTER);
 
 // Add fill + text to frame
-        batteryFrame.addView(batteryFill);
-        batteryFrame.addView(batteryText);
+// Add fill + text to frame
+        FrameLayout.LayoutParams fillParams = new FrameLayout.LayoutParams(
+                0,
+                FrameLayout.LayoutParams.MATCH_PARENT
+        );
+        batteryFrame.addView(batteryFill, fillParams);
+
+        FrameLayout.LayoutParams textParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+        );
+        batteryFrame.addView(batteryText, textParams);
 
 // Add to container
         batteryContainer.addView(batteryFrame);
@@ -325,7 +336,6 @@ public class MainActivity extends Activity {
 // Add to toolbar
         toolbar.addView(batteryContainer);
 
-        toolbar.addView(batteryText);
         updateBatteryText();
         startBatteryMonitor();
 
@@ -839,14 +849,20 @@ public class MainActivity extends Activity {
         batteryText.setText(battery + "%");
 
         // Adjust width based on battery %
-        int maxWidth = 150;
-        int newWidth = (int) (maxWidth * (battery / 100f));
+        batteryFill.post(() -> {
+            View parent = (View) batteryFill.getParent();
+            int parentWidth = parent.getWidth();
 
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                newWidth,
-                FrameLayout.LayoutParams.MATCH_PARENT
-        );
-        batteryFill.setLayoutParams(params);
+            if (parentWidth <= 0) return;
+
+            int newWidth = (int) (parentWidth * (battery / 100f));
+
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                    newWidth,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+            );
+            batteryFill.setLayoutParams(params);
+        });
 
         // Color logic
         if (battery < 20) {
