@@ -61,6 +61,9 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import android.content.IntentFilter;
+import android.os.BatteryManager;
+
 /**
  * MainActivity for Sanigear Kiosk App
  * Handles WebView display, kiosk mode enforcement, PDF downloads, watchdog logic, and admin unlock
@@ -74,6 +77,9 @@ public class MainActivity extends Activity {
     // Layout components
     private FrameLayout layout;
     private LinearLayout toolbar;
+
+    private TextView batteryText;
+    private Handler batteryHandler = new Handler();
     private WebView webView;
     private WebView popupWebView;
 
@@ -285,6 +291,16 @@ public class MainActivity extends Activity {
         });
         addButton("Connections", v -> showConnectionsDialog());
         addButton("*", v -> showAboutDialog());
+
+        batteryText = new TextView(this);
+        batteryText.setTextSize(18);
+        batteryText.setPadding(25, 10, 10, 10);
+        batteryText.setGravity(Gravity.CENTER_VERTICAL);
+        batteryText.setTextColor(Color.WHITE);
+
+        toolbar.addView(batteryText);
+        updateBatteryText();
+        startBatteryMonitor();
 
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -767,5 +783,63 @@ public class MainActivity extends Activity {
         } else {
             Log.w("KioskApp", "Device admin not active. Cannot disable status bar.");
         }
+    }
+
+    private int getTabletBatteryPercent() {
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent batteryStatus = registerReceiver(null, filter);
+
+        if (batteryStatus == null) return -1;
+
+        int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+        int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+
+        if (level < 0 || scale <= 0) return -1;
+
+        return (int) ((level / (float) scale) * 100);
+    }
+
+    private void updateBatteryText() {
+        if (batteryText == null) return;
+
+        int battery = getTabletBatteryPercent();
+
+        if (battery < 0) {
+            batteryText.setText("🔋 ?");
+            batteryText.setTextColor(Color.WHITE);
+            return;
+        }
+
+        IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent batteryStatus = registerReceiver(null, ifilter);
+
+        int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+        boolean isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING
+                || status == BatteryManager.BATTERY_STATUS_FULL;
+
+        String icon = isCharging ? "⚡" : "🔋";
+        batteryText.setText(icon + " " + battery + "%");
+
+        if (battery < 20) {
+            batteryText.setTextColor(Color.RED);
+            batteryText.setTextSize(22);
+            batteryText.setTypeface(null, android.graphics.Typeface.BOLD);
+        } else {
+            batteryText.setTextColor(Color.WHITE);
+            batteryText.setTextSize(18);
+            batteryText.setTypeface(null, android.graphics.Typeface.NORMAL);
+        }
+    }
+
+    private void startBatteryMonitor() {
+        batteryHandler.removeCallbacksAndMessages(null);
+
+        batteryHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                updateBatteryText();
+                batteryHandler.postDelayed(this, 60000);
+            }
+        }, 1000);
     }
 }
