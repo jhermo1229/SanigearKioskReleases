@@ -80,6 +80,8 @@ public class MainActivity extends Activity {
 
     private TextView batteryText;
     private Handler batteryHandler = new Handler();
+
+    private View batteryFill;
     private WebView webView;
     private WebView popupWebView;
 
@@ -292,11 +294,36 @@ public class MainActivity extends Activity {
         addButton("Connections", v -> showConnectionsDialog());
         addButton("*", v -> showAboutDialog());
 
+        LinearLayout batteryContainer = new LinearLayout(this);
+        batteryContainer.setOrientation(LinearLayout.HORIZONTAL);
+        batteryContainer.setGravity(Gravity.CENTER_VERTICAL);
+        batteryContainer.setPadding(25, 10, 10, 10);
+
+// Battery bar background (outline)
+        FrameLayout batteryFrame = new FrameLayout(this);
+        batteryFrame.setLayoutParams(new LinearLayout.LayoutParams(150, 50));
+        batteryFrame.setBackgroundColor(Color.DKGRAY);
+        batteryFrame.setBackgroundResource(android.R.drawable.alert_light_frame);
+
+// Inner fill (actual battery level)
+        batteryFill = new View(this);
+        batteryFill.setBackgroundColor(Color.GREEN);
+
+// Percentage text
         batteryText = new TextView(this);
-        batteryText.setTextSize(18);
-        batteryText.setPadding(25, 10, 10, 10);
-        batteryText.setGravity(Gravity.CENTER_VERTICAL);
-        batteryText.setTextColor(Color.WHITE);
+        batteryText.setTextColor(Color.BLACK);
+        batteryText.setTextSize(14);
+        batteryText.setGravity(Gravity.CENTER);
+
+// Add fill + text to frame
+        batteryFrame.addView(batteryFill);
+        batteryFrame.addView(batteryText);
+
+// Add to container
+        batteryContainer.addView(batteryFrame);
+
+// Add to toolbar
+        toolbar.addView(batteryContainer);
 
         toolbar.addView(batteryText);
         updateBatteryText();
@@ -800,34 +827,34 @@ public class MainActivity extends Activity {
     }
 
     private void updateBatteryText() {
-        if (batteryText == null) return;
+        if (batteryText == null || batteryFill == null) return;
 
         int battery = getTabletBatteryPercent();
 
         if (battery < 0) {
-            batteryText.setText("🔋 ?");
-            batteryText.setTextColor(Color.WHITE);
+            batteryText.setText("?");
             return;
         }
 
-        IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-        Intent batteryStatus = registerReceiver(null, ifilter);
+        batteryText.setText(battery + "%");
 
-        int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
-        boolean isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING
-                || status == BatteryManager.BATTERY_STATUS_FULL;
+        // Adjust width based on battery %
+        int maxWidth = 150;
+        int newWidth = (int) (maxWidth * (battery / 100f));
 
-        String icon = isCharging ? "⚡" : "🔋";
-        batteryText.setText(icon + " " + battery + "%");
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                newWidth,
+                FrameLayout.LayoutParams.MATCH_PARENT
+        );
+        batteryFill.setLayoutParams(params);
 
+        // Color logic
         if (battery < 20) {
-            batteryText.setTextColor(Color.RED);
-            batteryText.setTextSize(22);
-            batteryText.setTypeface(null, android.graphics.Typeface.BOLD);
+            batteryFill.setBackgroundColor(Color.RED);
+        } else if (battery < 50) {
+            batteryFill.setBackgroundColor(Color.YELLOW);
         } else {
-            batteryText.setTextColor(Color.WHITE);
-            batteryText.setTextSize(18);
-            batteryText.setTypeface(null, android.graphics.Typeface.NORMAL);
+            batteryFill.setBackgroundColor(Color.GREEN);
         }
     }
 
